@@ -29,7 +29,6 @@ def afficher_grille(grille):
         print()
 
 
-
 def placer_bateaux(grille):
     for nom, taille in BATEAUX.items():
         bateau_place = False
