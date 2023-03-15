@@ -1,205 +1,173 @@
 import random
 
-# la grille de jeu virtuelle est composée de 10 x 10 cases
-# une case est identifiée par ses coordonnées, un tuple (no_ligne, no_colonne)
-# un no_ligne ou no_colonne est compris dans le programme entre 1 et 10,
-# mais pour le joueur une colonne sera identifiée par une lettre (de 'A' à 'J')
+# différentes états possibles pour une case de la grille de jeu
+MER, TIR_RATE, TIR_TOUCHE, TIR_COULE = 0, 1, 2, 3
 
+# taille de la grille de jeu
 TAILLE_GRILLE = 10
 
-# détermination de la liste des lettres utilisées pour identifier les colonnes :
-LETTRES = "ABCDEFGHIJ"
+# liste des différents types de navires à placer sur la grille de jeu
+TYPES_NAVIRES = [
+    {"nom": "porte-avions", "taille": 5},
+    {"nom": "croiseur", "taille": 4},
+    {"nom": "contre-torpilleur", "taille": 3},
+    {"nom": "sous-marin", "taille": 3},
+    {"nom": "torpilleur", "taille": 2},
+]
+
+# variable globale contenant la flotte de navires
+flotte = []
 
 
-# chaque navire est constitué d'un dictionnaire dont les clés sont les
-# coordonnées de chaque case le composant, et les valeurs correspondantes
-# l'état de la partie du navire correspondant à la case
-# (True : intact ; False : touché)
-
-# les navires suivants sont disposés de façon fixe dans la grille :
-#      +---+---+---+---+---+---+---+---+---+---+
-#      | A | B | C | D | E | F | G | H | I | J |
-#      +---+---+---+---+---+---+---+---+---+---+
-#      | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10|
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  1 |   |   |   |   |   |   |   |   |   |   |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  2 |   | o | o | o | o | o |   |   |   |   |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  3 |   |   |   |   |   |   |   |   |   |   |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  4 | o |   |   |   |   |   |   |   |   |   |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  5 | o |   | o |   |   |   |   | o | o | o |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  6 | o |   | o |   |   |   |   |   |   |   |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  7 | o |   | o |   |   |   |   |   |   |   |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |  8 |   |   |   |   |   |   |   |   |   |   |
-# +----+---+---+---+---+---+---+---+---+---+---+
-# |
-
-# détermination des coordonnées des cases voisines
-def voisines(case):
+def initialiser_flotte():
     """
-    Cette fonction renvoie la liste des coordonnées des cases voisines
-    de la case passée en argument.
+    Initialise la flotte de navires avec des navires de tailles et de positions aléatoires sur la grille de jeu
     """
-    (ligne, colonne) = case
-    liste_voisines = []
-    for l in range(ligne - 1, ligne + 2):
-        for c in range(colonne - 1, colonne + 2):
-            if l >= 1 and l <= TAILLE_GRILLE and c >= 1 and c <= TAILLE_GRILLE:
-                liste_voisines.append((l, c))
-    liste_voisines.remove(case)
-    return liste_voisines
+    global flotte
+    flotte = []
+    for navire_type in TYPES_NAVIRES:
+        navire = placer_navire(navire_type["taille"])
+        flotte.append(navire)
 
 
-# détermination des cases occupées par un navire
-
-def cases_navire(navire):
+def placer_navire(taille):
     """
-    Cette fonction renvoie la liste des coordonnées des cases occupées par
-    le navire passé en argument.
+    Place un navire de la taille spécifiée sur la grille de jeu
     """
-    cases = []
-    for case in navire:
-        cases.append(case)
-        for voisine in voisines(case):
-            if voisine in navire and voisine not in cases:
-                cases.append(voisine)
-    return cases
+    while True:
+        # choisir une position et une direction aléatoires pour le navire
+        x = random.randint(0, TAILLE_GRILLE - 1)
+        y = random.randint(0, TAILLE_GRILLE - 1)
+        direction = random.choice(["horizontal", "vertical"])
 
-
-# vérification de la validité d'un navire
-
-def navire_valide(navire):
-    """
-    Cette fonction renvoie True si le navire passé en argument est valide
-    (c'est-à-dire si ses cases sont contiguës), False sinon.
-    """
-    if len(navire) == 0:
-        return False
-    cases = cases_navire(navire)
-    for case in cases:
-        for voisine in voisines(case):
-            if voisine in cases:
+        # vérifier si le navire peut être placé à cet endroit
+        positions = []
+        for i in range(taille):
+            if direction == "horizontal":
+                if x + i >= TAILLE_GRILLE:
+                    break
+                position = (x + i, y)
+            else:
+                if y + i >= TAILLE_GRILLE:
+                    break
+                position = (x, y + i)
+            if position_deja_occupee(position):
                 break
+            positions.append(position)
         else:
-            return False
-    return True
+            # le navire peut être placé à cet endroit
+            for position in positions:
+                ajouter_position_navire(position)
+            return {"taille": taille, "positions": positions, "touche": [False] * taille}
 
 
-# vérification de la validité de la grille de jeu
-
-def grille_valide(liste_navires):
+def position_deja_occupee(position):
     """
-    Cette fonction renvoie True si la grille de jeu passée en argument est valide,
-    False sinon.
+    Vérifie si la position spécifiée est déjà occupée par un autre navire
     """
-    # vérification de la validité des navires
-    for navire in liste_navires:
-        if not navire_valide(navire):
-            return False
-    # vérification de l'absence de superposition des navires
-    cases_occupees = []
-    for navire in liste_navires:
-        for case in cases_navire(navire):
-            if case in cases_occupees:
-                return False
-            cases_occupees.append(case)
-    return True
+    for navire in flotte:
+        if position in navire["positions"]:
+            return True
+    return False
 
 
-# initialisation de la grille de jeu
-
-while not grille_valide(liste_navires):
-    # placement des navires
-    porte_avion.clear()
-    while not navire_valide(porte_avion):
-        coordonnees = input("Placement du porte-avions (5 cases) : ")
-        colonne = LETTRES.index(coordonnees[0].upper()) + 1
-        ligne = int(coordonnees[1:])
-        porte_avion = {(ligne, colonne + i): True for i in range(5)}
-    croiseur.clear()
-    while not navire_valide(croiseur):
-        coordonnees = input("Placement du croiseur (4 cases) : ")
-        colonne = LETTRES.index(coordonnees[0].upper()) + 1
-        ligne = int(coordonnees[1:])
-        croiseur = {(ligne, colonne + i): True for i in range(4)}
-    contre_torpilleur.clear()
-    while not navire_valide(contre_torpilleur):
-        coordonnees = input("Placement du contre-torpilleur (3 cases) : ")
-
-
-def placer_navires():
+def ajouter_position_navire(position):
     """
-    Place les navires dans la grille de jeu.
+    Ajoute la position spécifiée à la liste des positions occupées par les navires
     """
-    # Placement du porte-avion en B2 :
-    for i in range(5):
-        porte_avion[(2, i + 2)] = True
+    for navire in flotte:
+        navire["positions"].append(position)
 
-    # Placement du croiseur en A4 :
-    for i in range(4):
-        croiseur[(i + 1, 1)] = True
 
-    # Placement du contre-torpilleur en C5 :
-    for i in range(3):
-        contre_torpilleur[(i + 3, 4)] = True
+def demande_coord():
+    """
+    Demande les coordonnées d'un tir au joueur et les renvoie sous forme de tuple
+    """
+    while True:
+        try:
+            x = int(input("Entrez la coordonnée x (entre 0 et 9) : "))
+            y = int(input("Entrez la coordonnée y (entre 0 et 9) : "))
+            if 0 <= x < TAILLE_GRILLE and 0 <= y < TAILLE_GRILLE:
+                return (x, y)
+            print("Coordonnées invalides, veuillez réessayer.")
+        except ValueError:
+            print("Coordonnées invalides, veuillez réessayer.")
 
-    # Placement du sous-marin en H5 :
-    sous_marin[(5, 8)] = True
-    sous_marin[(6, 8)] = True
-    sous_marin[(7, 8)] = True
 
-    # Placement du torpilleur en E9 :
-    torpilleur[(9, 4)] = True
-    torpilleur[(9, 5)] = True
-
-    # Ajout des navires à la liste des navires :
-    liste_navires.extend([porte_avion, croiseur, contre_torpilleur, sous_marin, torpilleur])
+def afficher_grille(grille):
+    """
+    Affiche la grille de jeu
+    """
+    print(" 0123456789")
+    for y in range(TAILLE_GRILLE):
+        ligne = str(y) + " "
+        for x in range(TAILLE_GRILLE):
+            if grille[x][y] == MER:
+                ligne += "~"
+            elif grille[x][y] == TIR_RATE:
+                ligne += "o"
+            elif grille[x][y] == TIR_TOUCHE:
+                ligne += "X"
+            elif grille[x][y] == TIR_COULE:
+                ligne += "#"
+        print(ligne)
 
 
 def jouer():
     """
-    Joue une partie de bataille navale.
+    Fonction principale pour jouer une partie de bataille navale
     """
-    placer_navires()
-    afficher_grille()
-
+    print("Bienvenue dans la bataille navale !")
+    initialiser_flotte()
+    grille = [[MER] * TAILLE_GRILLE for _ in range(TAILLE_GRILLE)]
+    nb_tirs = 0
     while True:
-        # Demande les coordonnées d'un tir au joueur :
-        coordonnees_tir = demander_coordonnees_tir()
-
-        # Vérifie si le tir touche un navire :
-        navire_touche = None
-        for navire in liste_navires:
-            if coordonnees_tir in navire:
-                navire_touche = navire
-                navire[coordonnees_tir] = False  # Marque la case touchée
-                break
-
-        # Affiche le résultat du tir :
-        if navire_touche is not None:
+        afficher_grille(grille)
+        coord = demande_coord()
+        nb_tirs += 1
+        if tirer(grille, coord):
             print("Touché !")
-        else:
-            print("Dans l'eau !")
-
-        # Vérifie si tous les navires ont été coulés :
-        tous_coules = True
-        for navire in liste_navires:
-            if any(navire.values()):
-                tous_coules = False
-                break
-
-        if tous_coules:
-            print("Bravo, vous avez coulé tous les navires !")
+        if flotte_coulee():
+            print("Vous avez coulé tous les navires en", nb_tirs, "tirs !")
             break
+        else:
+            print("Dans l'eau...")
+    print("Merci d'avoir joué !")
 
-    print("Fin de la partie.")
+
+def tirer(grille, coord):
+    """
+    Effectue un tir sur la grille de jeu aux coordonnées spécifiées.
+    Renvoie True si un navire a été touché, False sinon.
+    """
+    x, y = coord
+    if grille[x][y] == TIR_RATE or grille[x][y] == TIR_TOUCHE or grille[x][y] == TIR_COULE:
+        print("Vous avez déjà tiré à cet endroit.")
+        return False
+    grille[x][y] = TIR_RATE
+    for navire in flotte:
+        if coord in navire["positions"]:
+            navire["touche"][navire["positions"].index(coord)] = True
+        if all(navire["touche"]):
+            for position in navire["positions"]:
+                grille[position[0]][position[1]] = TIR_COULE
+                print("Coulé !")
+            else:
+                grille[x][y] = TIR_TOUCHE
+                print("Touché !")
+            return True
+        return False
 
 
-# Lancement de la partie :
+def flotte_coulee():
+    """
+    Vérifie si tous les navires de la flotte ont été coulés
+    """
+    for navire in flotte:
+        if not all(navire["touche"]):
+            return False
+        return True
+
+
+# jouer une partie
 jouer()
